@@ -57,13 +57,13 @@ Env overrides: `LIDARR_URL`, `LIDARR_API_KEY`. In the container, env vars or a c
 
 1. `GET` the project API. If `paused` is true, log it and exit 0.
 2. Resolve via `GET /api/v1/search?term="<artist> <album>"`, take the first album-type result, giving `foreignAlbumId` and the artist's `foreignArtistId`. No match: print "could not resolve <artist> - <album>" on stderr, exit 1. Never guess a partial match.
-3. Idempotency check, `GET /api/v1/album?foreignAlbumId=<mbid>`. Present and already monitored: print "already added", exit 0. Present and unmonitored: fall through to the monitor step only.
+3. Idempotency check, `GET /api/v1/album?foreignAlbumId=<mbid>`. Present and already monitored: print "already added", exit 0 with no writes at all (an album that predates this script does not get tagged retroactively; no-op runs are side-effect free). Present and unmonitored: continue with the normal flow, which naturally reduces to monitor + search since the artist necessarily exists.
 4. Ensure tag exists (`GET/POST /api/v1/tag`), ensure root folder exists (`GET/POST /api/v1/rootfolder`), look up quality and metadata profile ids (`GET /api/v1/qualityprofile`, `GET /api/v1/metadataprofile`, first/default unless `quality_profile` names one).
 5. Artist lookup `GET /api/v1/artist?foreignArtistId=`:
    - New: `POST /api/v1/artist` with the MBID, name, the 1001 root folder, the tag, `monitor: "none"` so no discography grab, and the target album flagged monitored in the `albums` payload.
    - Existing: `PATCH /api/v1/artist` to add the tag if missing. Root folder untouched.
 6. Re-fetch the album to get its Lidarr DB id, `PUT /api/v1/album/monitor` `{albumIds: [id], monitored: true}`. This is deliberate even for new artists, working around the silent-drop quirk.
-7. `POST /api/v1/command` `{"name": "AlbumSearch", "albumIds": [id]}` so Lidarr searches indexers immediately.
+7. `POST /api/v1/command` `{"name": "AlbumSearch", "albumIds": [id]}` so Lidarr searches indexers immediately. Always queued on a run that gets this far; when the album already had all its files, Lidarr finds nothing missing and the command is a no-op.
 8. Print a summary line: artist, album, action taken (added artist / existing artist), command queued.
 
 `--dry-run` runs steps 1 to 3, prints the resolved MBIDs and what it would do, exits without writing anything.
