@@ -28,9 +28,7 @@ class SyncError(Exception):
     """A failure reported to the user as a one-line message."""
 
 
-# ---------------------------------------------------------------------------
-# Pure helpers (unit tested)
-# ---------------------------------------------------------------------------
+# --- pure helpers, covered by tests ---
 
 
 def normalize(text: str) -> str:
@@ -42,9 +40,8 @@ def normalize(text: str) -> str:
 def pick_album_result(results: list, artist: str, album: str):
     """Return the first album-type search result matching artist and title.
 
-    Only accepts a full match on both artist name and album title (after
-    normalization); anything less is reported as unresolvable rather than
-    guessed.
+    Both the artist name and the album title must match after normalization.
+    Anything less gets reported as unresolvable instead of guessed.
     """
     for r in results:
         if r.get("type") != "album":
@@ -113,9 +110,7 @@ def load_config(path: Path) -> dict:
     return cfg
 
 
-# ---------------------------------------------------------------------------
-# API clients
-# ---------------------------------------------------------------------------
+# --- API clients ---
 
 
 class Generator:
@@ -184,13 +179,13 @@ class Lidarr:
         self.post("/api/v1/rootfolder", {"path": path})
 
     def album_db_id(self, artist_resource: dict, album_mbid: str):
-        """Lidarr DB id of the album, waiting for an artist refresh if needed."""
+        """Lidarr DB id of the album, refreshing the artist if it is not there yet."""
         if artist_resource:
             for album in artist_resource.get("albums") or []:
                 if album.get("foreignAlbumId") == album_mbid:
                     return album["id"]
-            # Album not in the DB yet (typically released after the artist was
-            # last refreshed); refresh and poll for it to show up.
+            # Album not in the DB yet, typically released after the artist was
+            # last refreshed. Refresh, then poll until it shows up.
             self.post("/api/v1/command", {"name": "ArtistRefresh",
                                           "artistId": artist_resource["id"]})
             deadline = time.time() + REFRESH_WAIT_SECONDS
@@ -209,9 +204,7 @@ class Lidarr:
         )
 
 
-# ---------------------------------------------------------------------------
-# Main flow
-# ---------------------------------------------------------------------------
+# --- main flow ---
 
 
 def sync(lidarr: Lidarr, cfg: dict, session: requests.Session, dry_run: bool = False) -> None:
@@ -244,12 +237,14 @@ def sync(lidarr: Lidarr, cfg: dict, session: requests.Session, dry_run: bool = F
         print(f"  album MBID:    {album_mbid}")
         print(f"  artist MBID:   {artist_mbid}")
         if existing_artist:
-            print(f"  artist exists in Lidarr (id {existing_artist[0]['id']}), would only: "
-                  f"add tag '{cfg['tag']}' if missing, monitor this album, queue AlbumSearch")
+            print(f"  artist already in Lidarr, id {existing_artist[0]['id']}")
+            print(f"  would add tag '{cfg['tag']}' if missing, monitor this album, "
+                  "queue AlbumSearch")
         else:
-            print(f"  artist not in Lidarr, would: create tag '{cfg['tag']}', "
-                  f"ensure root folder '{cfg['root_folder_path']}', add artist there "
-                  "with only this album monitored, queue AlbumSearch")
+            print("  artist not in Lidarr yet")
+            print(f"  would create tag '{cfg['tag']}' and root folder "
+                  f"'{cfg['root_folder_path']}', add the artist there with only "
+                  "this album monitored, queue AlbumSearch")
         return
 
     tag_id = lidarr.ensure_tag(cfg["tag"])
@@ -261,7 +256,8 @@ def sync(lidarr: Lidarr, cfg: dict, session: requests.Session, dry_run: bool = F
         created = lidarr.post("/api/v1/artist", build_add_artist_payload(
             hit, tag_id, quality_id, metadata_id, cfg["root_folder_path"]))
         album_id = lidarr.album_db_id(created, album_mbid)
-        action = f"added artist '{artist_name}' to '{cfg['root_folder_path']}' tagged '{cfg['tag']}'"
+        action = (f"added artist '{artist_name}' to '{cfg['root_folder_path']}' "
+                  f"with tag '{cfg['tag']}'")
     else:
         artist = existing_artist[0]
         new_tags = merged_tags(artist.get("tags") or [], tag_id)
@@ -269,10 +265,10 @@ def sync(lidarr: Lidarr, cfg: dict, session: requests.Session, dry_run: bool = F
             artist["tags"] = new_tags
             lidarr.put(f"/api/v1/artist/{artist['id']}", artist)
         album_id = lidarr.album_db_id(artist, album_mbid)
-        action = f"used existing artist '{artist_name}' (root folder untouched)"
+        action = f"used existing artist '{artist_name}', root folder untouched"
 
-    # Explicit monitor call: the albums array in the add payload is applied
-    # unreliably by Lidarr, this makes the state certain.
+    # Lidarr applies the albums array in the add payload unreliably; this
+    # explicit call makes the monitor state certain.
     lidarr.put("/api/v1/album/monitor", {"albumIds": [album_id], "monitored": True})
     lidarr.post("/api/v1/command", {"name": "AlbumSearch", "albumIds": [album_id]})
     print(f"done: monitoring and searching '{artist_name} - {album_name}' ({action})")

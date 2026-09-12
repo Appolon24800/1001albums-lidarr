@@ -4,10 +4,11 @@ Each run takes the current album from a [1001albumsgenerator.com](https://1001al
 project and makes Lidarr monitor and grab exactly that album. Safe to run
 repeatedly: once the album is monitored, further runs that day do nothing.
 
-New artists are added to a dedicated root folder and tagged `1001 Album
-Generator` (both configurable), with only the day's album monitored, never the
-whole discography. An artist that already exists in your library stays where
-they are and just receives the tag and the monitored album.
+The script adds each new artist to a dedicated root folder with the tag
+`1001 Album Generator`; folder and tag names come from the config. Only the
+day's album gets monitored, never a whole discography. An artist already in
+your library keeps their root folder and receives only the tag and the new
+monitored album.
 
 ## Setup
 

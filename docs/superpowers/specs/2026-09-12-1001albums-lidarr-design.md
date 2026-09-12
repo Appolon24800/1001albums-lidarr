@@ -10,8 +10,8 @@ The project API (`GET https://1001albumsgenerator.com/api/v1/projects/<id>`) ret
 
 Lidarr facts that shape the design:
 
-- Lidarr has no playlist or library object. Grouping is done with tags and root folders.
-- An artist has exactly one root folder. Moving an artist to a "1001" folder would relocate their entire discography, so existing artists are never moved, only tagged.
+- Lidarr has no playlist or library object. You group artists with tags and root folders.
+- An artist has exactly one root folder. Moving an artist to a "1001" folder would relocate their entire discography, so the script never moves an existing artist; it only tags them.
 - Album-level monitoring on artist add is unreliable: the `albums` array with a monitored flag can be silently dropped. The robust pattern (used by digarr) is add the artist unmonitored at the strategy level, then `PUT /api/v1/album/monitor` with the album's DB id, then trigger an `AlbumSearch` command.
 
 ## Decisions
@@ -62,7 +62,7 @@ Env overrides: `LIDARR_URL`, `LIDARR_API_KEY`. In the container, env vars or a c
 5. Artist lookup `GET /api/v1/artist?foreignArtistId=`:
    - New: `POST /api/v1/artist` with the MBID, name, the 1001 root folder, the tag, `monitor: "none"` so no discography grab, and the target album flagged monitored in the `albums` payload.
    - Existing: `PATCH /api/v1/artist` to add the tag if missing. Root folder untouched.
-6. Re-fetch the album to get its Lidarr DB id, `PUT /api/v1/album/monitor` `{albumIds: [id], monitored: true}`. This is deliberate even for new artists, working around the silent-drop quirk.
+6. Re-fetch the album to get its Lidarr DB id, `PUT /api/v1/album/monitor` `{albumIds: [id], monitored: true}`. This is deliberate even for new artists; it works around the silent-drop quirk.
 7. `POST /api/v1/command` `{"name": "AlbumSearch", "albumIds": [id]}` so Lidarr searches indexers immediately. Always queued on a run that gets this far; when the album already had all its files, Lidarr finds nothing missing and the command is a no-op.
 8. Print a summary line: artist, album, action taken (added artist / existing artist), command queued.
 
@@ -70,7 +70,7 @@ Env overrides: `LIDARR_URL`, `LIDARR_API_KEY`. In the container, env vars or a c
 
 ## Error handling
 
-Every HTTP call fails loudly on non-2xx: message on stderr naming the endpoint, exit 1, no partial writes where avoidable (the add-then-monitor sequence is idempotent on re-run, so a failure mid-sequence is safe to retry next execution). Timeouts set explicitly (10 s per call). No retries, no backoff. Errors never raise raw tracebacks to the user; top-level handler prints a one-liner.
+Every HTTP call fails loudly on non-2xx: message on stderr naming the endpoint, exit 1, no partial writes where avoidable (the add-then-monitor sequence is idempotent on re-run, so a failure mid-sequence is safe to retry next execution). Timeouts set explicitly (10 s per call). No retries, no backoff. The user never sees a raw traceback; the top-level handler prints a one-liner.
 
 ## Testing
 
