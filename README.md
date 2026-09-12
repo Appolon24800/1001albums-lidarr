@@ -10,15 +10,27 @@ day's album gets monitored, never a whole discography. An artist already in
 your library keeps their root folder and receives only the tag and the new
 monitored album.
 
-## Setup
+## Configuration
+
+Environment variables, a config file, or both: variables win over the file,
+and the file is optional. To use the file, copy the example and edit it:
 
 ```sh
 cp config.example.json config.json
 ```
 
-Fill in `lidarr_url`, `lidarr_api_key` (Lidarr → Settings → General → API Key)
-and `root_folder_path` exactly as Lidarr sees it. `LIDARR_URL` and
-`LIDARR_API_KEY` environment variables override the file.
+| env var          | config key         | default                |
+|------------------|--------------------|------------------------|
+| LIDARR_URL       | lidarr_url         | required               |
+| LIDARR_API_KEY   | lidarr_api_key     | required               |
+| ROOT_FOLDER_PATH | root_folder_path   | required               |
+| PROJECT_ID       | project_id         | appolon                |
+| TAG              | tag                | 1001 Album Generator   |
+| QUALITY_PROFILE  | quality_profile    | first profile in Lidarr |
+
+`ROOT_FOLDER_PATH` / `root_folder_path` must be the path exactly as Lidarr
+sees it, e.g. `/tank/media/music/1001 Album Generator`. The API key lives in
+Lidarr under Settings → General.
 
 ## Run
 
@@ -33,11 +45,12 @@ With Docker (image published to GHCR from `main`):
 docker run --rm \
   -e LIDARR_URL=http://your-lidarr:8686 \
   -e LIDARR_API_KEY=... \
+  -e ROOT_FOLDER_PATH=/music/1001\ Album\ Generator \
   ghcr.io/appolon24800/1001albums-lidarr:latest
 ```
 
-Or mount a `config.json` at `/app/config.json`. The container is one-shot: one
-run, one sync, exit.
+Or mount a `config.json` at `/app/config.json` if you prefer the file. The
+container is one-shot: one run, one sync, exit.
 
 ## Scheduling
 

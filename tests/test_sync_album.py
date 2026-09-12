@@ -102,15 +102,41 @@ def test_load_config_env_overrides_file(tmp_path, monkeypatch):
     path = tmp_path / "config.json"
     path.write_text(json.dumps({
         "lidarr_url": "http://file", "lidarr_api_key": "file-key",
-        "root_folder_path": "/music/1001",
+        "root_folder_path": "/music/1001", "project_id": "file-project",
     }))
     monkeypatch.setenv("LIDARR_URL", "http://env")
     monkeypatch.setenv("LIDARR_API_KEY", "env-key")
+    monkeypatch.setenv("PROJECT_ID", "env-project")
     cfg = load_config(path)
     assert cfg["lidarr_url"] == "http://env"
     assert cfg["lidarr_api_key"] == "env-key"
+    assert cfg["project_id"] == "env-project"
+    assert cfg["tag"] == "1001 Album Generator"
+
+
+def test_load_config_env_only_without_any_file(tmp_path, monkeypatch):
+    for var in ("LIDARR_URL", "LIDARR_API_KEY", "PROJECT_ID",
+                "ROOT_FOLDER_PATH", "TAG", "QUALITY_PROFILE"):
+        monkeypatch.delenv(var, raising=False)
+    monkeypatch.setenv("LIDARR_URL", "http://env")
+    monkeypatch.setenv("LIDARR_API_KEY", "env-key")
+    monkeypatch.setenv("ROOT_FOLDER_PATH", "/music/1001")
+    cfg = load_config(tmp_path / "does-not-exist.json")
+    assert cfg["lidarr_url"] == "http://env"
+    assert cfg["root_folder_path"] == "/music/1001"
     assert cfg["project_id"] == "appolon"
     assert cfg["tag"] == "1001 Album Generator"
+
+
+def test_load_config_empty_env_var_falls_back_to_file(tmp_path, monkeypatch):
+    path = tmp_path / "config.json"
+    path.write_text(json.dumps({
+        "lidarr_url": "http://file", "lidarr_api_key": "file-key",
+        "root_folder_path": "/music/1001",
+    }))
+    monkeypatch.setenv("LIDARR_URL", "")
+    cfg = load_config(path)
+    assert cfg["lidarr_url"] == "http://file"
 
 
 def test_load_config_requires_credentials_and_root_folder(tmp_path, monkeypatch):

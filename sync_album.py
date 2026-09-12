@@ -6,6 +6,10 @@ resolves it against MusicBrainz through Lidarr's search endpoint, then makes
 sure exactly that album is monitored and searched in Lidarr. Runs are
 idempotent: if the album is already monitored the script exits without
 writing anything.
+
+Configuration comes from environment variables (LIDARR_URL, LIDARR_API_KEY,
+ROOT_FOLDER_PATH, PROJECT_ID, TAG, QUALITY_PROFILE) overriding an optional
+config.json next to the script.
 """
 
 from __future__ import annotations
@@ -88,25 +92,27 @@ def pick_profile(profiles: list, name: str | None):
 
 
 def load_config(path: Path) -> dict:
-    """Merge config.json with LIDARR_URL / LIDARR_API_KEY env overrides."""
+    """Merge environment variables over an optional config.json."""
     data = {}
     if path.exists():
         data = json.loads(path.read_text())
     cfg = {
         "lidarr_url": os.environ.get("LIDARR_URL") or data.get("lidarr_url"),
         "lidarr_api_key": os.environ.get("LIDARR_API_KEY") or data.get("lidarr_api_key"),
-        "project_id": data.get("project_id", "appolon"),
-        "root_folder_path": data.get("root_folder_path"),
-        "tag": data.get("tag", "1001 Album Generator"),
-        "quality_profile": data.get("quality_profile"),
+        "project_id": os.environ.get("PROJECT_ID") or data.get("project_id", "appolon"),
+        "root_folder_path": os.environ.get("ROOT_FOLDER_PATH") or data.get("root_folder_path"),
+        "tag": os.environ.get("TAG") or data.get("tag", "1001 Album Generator"),
+        "quality_profile": os.environ.get("QUALITY_PROFILE") or data.get("quality_profile"),
     }
     if not cfg["lidarr_url"] or not cfg["lidarr_api_key"]:
         raise SyncError(
-            "lidarr_url and lidarr_api_key are required: put them in "
-            f"{path} or export LIDARR_URL / LIDARR_API_KEY"
+            "lidarr_url and lidarr_api_key are required: set LIDARR_URL / "
+            f"LIDARR_API_KEY or put them in {path}"
         )
     if not cfg["root_folder_path"]:
-        raise SyncError(f"root_folder_path is required in {path}")
+        raise SyncError(
+            f"root_folder_path is required: set ROOT_FOLDER_PATH or add it to {path}"
+        )
     return cfg
 
 
