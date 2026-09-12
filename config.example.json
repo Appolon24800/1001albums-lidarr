@@ -1,0 +1,8 @@
+{
+  "lidarr_url": "http://your-lidarr-host:8686",
+  "lidarr_api_key": "YOUR_LIDARR_API_KEY",
+  "project_id": "appolon",
+  "root_folder_path": "/music/1001 Album Generator",
+  "tag": "1001 Album Generator",
+  "quality_profile": null
+}
